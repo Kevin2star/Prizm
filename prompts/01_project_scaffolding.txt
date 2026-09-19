@@ -1,6 +1,6 @@
 역할: 시니어 풀스택 엔지니어. 해커톤(26시간)용 프로젝트를 처음부터 세팅한다.
 선행 단계: 없음. 이 파일이 첫 단계다.
-이번 단계 목표: 백엔드(Spring Boot 3) + 프론트(React)를 한 저장소에서 실행 가능하게 만든다.
+이번 단계 목표: Supabase(Edge Functions) + 프론트(React)를 한 저장소에서 실행 가능하게 만든다.
 다음 단계: 02_data_model.txt
 
 ================================================================
@@ -13,47 +13,38 @@
 ================================================================
 기술 스택 (변경 금지)
 ================================================================
-- 백엔드: Spring Boot 3, Java 17+, Spring Data JPA, Spring Web
-- DB: MySQL 8
+- 백엔드: Supabase Edge Functions. Spring Boot를 만들지 않는다.
+- DB: Supabase Postgres. 로컬 MySQL/Postgres 설치는 하지 않는다.
 - 프론트: React (Vite 권장), JavaScript 또는 TypeScript
-- 패키지 매니저: 백엔드는 Maven 또는 Gradle 중 하나, 프론트는 npm
+- 패키지 매니저: 프론트는 npm
 - 벡터DB / Redis / Docker 오케스트레이션은 아직 도입하지 않는다.
+- Supabase Auth로 제품 로그인을 만들지 않는다. Gemini는 Functions secret으로만 호출한다.
 
 권장 디렉터리 구조:
-  /backend     Spring Boot
   /frontend    React (Vite)
-  /prompts     (이미 존재, 건드리지 말 것)
+  /supabase    migrations, functions, seed.sql
+  /prompts     (이미 존재, 스택 문구만 맞출 것)
   README.md
 
 ================================================================
 구현할 것
 ================================================================
-1) backend
-   - Spring Boot 3 앱 생성
-   - application.yml:
-     - MySQL 연결 (환경변수 사용: DB_URL, DB_USERNAME, DB_PASSWORD)
-     - JPA ddl-auto는 개발 단계이므로 update
-     - 서버 포트 8080
-   - CORS: http://localhost:5173 (Vite 기본) 허용
-   - 헬스체크: GET /api/health → { "status": "ok" }
-   - .env.example 또는 application-example.yml에 필요한 키 목록을 적어 둔다.
-     필요한 키(값은 넣지 말 것):
-       DB_URL, DB_USERNAME, DB_PASSWORD
-       GEMINI_API_KEY
-       GEMINI_TAG_MODEL=gemini-2.5-flash
-       GEMINI_EMBED_MODEL=gemini-embedding-001
+1) supabase
+   - migrations로 spaces/members/artifacts/artifact_groups 테이블
+   - Edge Function prizm-api: GET /health → { "status": "ok" }
+   - Gemini 키는 Functions secret. 프론트 VITE_에 넣지 않는다.
 
 2) frontend
    - Vite + React 앱
    - 개발 서버 포트 5173
-   - API 베이스 URL은 VITE_API_BASE_URL (기본값 http://localhost:8080)
+   - VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
    - 임시 홈 화면: 프로젝트 이름과 "스페이스 만들기 / 참여하기" 자리만 표시
      (실제 폼 로직은 05단계에서 구현)
 
 3) 루트 README.md
    - 한 줄 정의
-   - 사전 요구사항 (JDK, Node, MySQL)
-   - backend / frontend 각각 실행 명령
+   - 사전 요구사항 (Node, Supabase 프로젝트 + anon key)
+   - Functions 배포 / frontend 실행 명령
    - 환경변수 목록
 
 ================================================================
@@ -61,13 +52,13 @@
 ================================================================
 - 엔티티, API, Gemini 연동, WebSocket, 시각화를 이 단계에서 구현하지 않는다.
 - 로그인/회원가입/OAuth를 만들지 않는다. 이 서비스는 로그인 없이 코드로 입장한다.
-- Docker Compose는 필수가 아니다. 로컬 MySQL을 쓴다고 가정한다.
+- Docker Compose는 필수가 아니다. Supabase 호스티드 Postgres를 쓴다고 가정한다.
 - 불필요한 라이브러리를 미리 설치하지 않는다.
 
 ================================================================
 완료 기준
 ================================================================
-- backend를 띄우면 GET /api/health 가 200을 반환한다.
+- backend를 띄우면 GET /health 가 200을 반환한다.
 - frontend를 띄우면 브라우저에 홈 플레이스홀더가 보인다.
 - README만 보고 다른 팀원이 로컬에서 두 앱을 실행할 수 있다.
 - 시크릿(.env, API 키)이 커밋되지 않도록 .gitignore가 설정되어 있다.

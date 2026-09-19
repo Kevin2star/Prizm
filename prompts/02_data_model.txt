@@ -1,6 +1,6 @@
-역할: Spring Data JPA 백엔드 엔지니어.
+역할: Postgres 스키마 엔지니어.
 선행 단계: 01_project_scaffolding.txt 가 완료되어 있어야 한다.
-이번 단계 목표: PRD 데이터 모델을 JPA 엔티티 + 테이블로 구현한다.
+이번 단계 목표: PRD 데이터 모델을 Supabase 마이그레이션 SQL로 구현한다.
 다음 단계: 03_space_and_join_api.txt
 
 ================================================================
@@ -60,25 +60,23 @@ Group
 ================================================================
 구현할 것
 ================================================================
-1) 위 엔티티와 대응하는 JPA 클래스, Enum, Repository를 만든다.
-2) embedding / tags는 MySQL JSON 컬럼 또는 LONGTEXT에 JSON 문자열로 저장한다.
-   벡터DB는 쓰지 않는다.
-3) 엔티티 간 양방향 매핑은 최소화한다. 필요한 쪽(주로 many-to-one)만 둔다.
-4) 애플리케이션을 띄워 ddl-auto=update 로 테이블이 생성되는지 확인한다.
-5) 간단한 패키지 구조 예:
-     com.prizm.domain / com.prizm.repository / com.prizm.api / com.prizm.ai
+1) 위 엔티티와 대응하는 테이블을 supabase/migrations 에 만든다.
+2) embedding / tags는 Postgres TEXT 컬럼에 JSON 문자열로 저장한다.
+   벡터DB(pgvector 포함)는 쓰지 않는다.
+3) 테이블명 artifact_groups 로 group 예약어를 피한다.
+4) RLS: anon SELECT 허용, 쓰기는 Edge Function(service role)만.
+5) Realtime publication에 artifacts, artifact_groups, members를 넣는다.
 
 ================================================================
 하지 말 것
 ================================================================
 - REST API 컨트롤러를 이 단계에서 본격 구현하지 않는다. (다음 단계)
 - Gemini 호출, 유사도 계산, WebSocket을 넣지 않는다.
-- Flyway/Liquibase는 필수가 아니다. 시간 절약을 위해 ddl-auto로 충분하다.
+- Flyway/Liquibase/Hibernate ddl-auto에 의존하지 않는다. supabase/migrations 를 쓴다.
 - User, Auth, Session 테이블을 만들지 않는다.
 
 ================================================================
 완료 기준
 ================================================================
-- Space, Member, Artifact, Group 테이블이 MySQL에 생긴다.
-- Repository가 컴파일되고 컨텍스트가 정상 기동한다.
+- Space, Member, Artifact, Group 테이블이 Supabase Postgres에 생긴다.
 - embedding을 별도 벡터 스토어가 아니라 DB 컬럼에 저장하는 설계가 코드에 반영되어 있다.

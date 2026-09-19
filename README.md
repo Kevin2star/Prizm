@@ -6,54 +6,61 @@
 
 ## 사전 요구사항
 
-- JDK 17+
 - Node.js 20+ (npm)
-- MySQL 8
+- Supabase 프로젝트 1개 (Postgres + Edge Functions + Realtime)
+- Dashboard의 Project URL, anon public key
+- Functions secret으로 넣을 `GEMINI_API_KEY` (시드는 키 없이 READY. 실시간 시연 1건에만 필요)
 
-```sql
-CREATE DATABASE prizm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+JDK, 로컬 MySQL/Postgres, Spring Boot는 필요하지 않습니다.
 
 ## 환경변수
 
-루트 `.env.example`과 `backend/application-example.yml`을 참고합니다. 시크릿은 커밋하지 마세요.
+시크릿은 커밋하지 마세요. 프론트에는 anon key만 넣습니다. Gemini 키와 service role은 프론트/`VITE_`에 넣지 마세요.
+
+프론트 `frontend/.env`:
 
 | 변수 | 설명 |
 | --- | --- |
-| `DB_URL` | JDBC URL |
-| `DB_USERNAME` | MySQL 사용자 |
-| `DB_PASSWORD` | MySQL 비밀번호 |
-| `GEMINI_API_KEY` | Gemini API 키. 시드 데이터는 키 없이 READY 상태로 들어갑니다. 실시간 시연 1건에만 필요합니다. |
+| `VITE_SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Dashboard > Settings > API > anon public |
+
+Edge Functions secrets (`supabase secrets set` 또는 Dashboard > Edge Functions > Secrets):
+
+| 변수 | 설명 |
+| --- | --- |
+| `GEMINI_API_KEY` | Gemini API 키 |
 | `GEMINI_TAG_MODEL` | 기본값 `gemini-2.5-flash` |
 | `GEMINI_EMBED_MODEL` | 기본값 `gemini-embedding-001` |
-| `VITE_API_BASE_URL` | 기본값 `http://localhost:8080` |
+| `SIMILARITY_THRESHOLD` | 기본값 `0.75` |
 
-PowerShell 예시:
+`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 는 호스티드 Functions에 자동으로 주입됩니다.
 
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"
-$env:DB_URL = "jdbc:mysql://localhost:3306/prizm?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-$env:DB_USERNAME = "root"
-$env:DB_PASSWORD = "your-password"
-$env:GEMINI_API_KEY = "your-key"
-```
+## Supabase 세팅
 
-## Backend
+1. 새 프로젝트 생성 (또는 기존 프로젝트 사용)
+2. SQL Editor에서 `supabase/migrations/20260919100000_prizm_schema.sql` 실행
+3. SQL Editor에서 `supabase/seed.sql` 실행 (CAFE01 데모 스페이스)
+4. Realtime이 artifacts / artifact_groups / members 를 구독하는지 Database > Publications 에서 확인
+5. Functions 배포:
 
 ```powershell
-cd backend
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-17.0.20.101-hotspot"
-./mvnw spring-boot:run
+supabase functions deploy prizm-api
+supabase functions deploy analyze-artifact
+supabase secrets set GEMINI_API_KEY=your-key
 ```
 
-헬스체크: http://localhost:8080/api/health → `{ "status": "ok" }`
+헬스체크:
 
-기동 시 데모 스페이스 `CAFE01` / `교내 카페 개선안` 이 자동 시드됩니다.
+`https://<project-ref>.supabase.co/functions/v1/prizm-api/health` → `{ "status": "ok" }`
+
+Authorization 헤더에 anon key를 Bearer로 넣습니다.
 
 ## Frontend
 
 ```powershell
 cd frontend
+copy .env.example .env
+# VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY 입력
 npm install
 npm run dev
 ```

@@ -1,11 +1,10 @@
-import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
-import { API_BASE } from './api'
+import { supabase } from './api'
 
 export function connectSpaceRealtime(spaceId, onEvent) {
   let active = true
   let pollTimer = null
-  let client = null
+  let channel = null
+  let subscribed = false
 
   const startPolling = () => {
     if (pollTimer || !active) return
@@ -14,31 +13,62 @@ export function connectSpaceRealtime(spaceId, onEvent) {
     }, 3000)
   }
 
+  const emit = (payload) => {
+    if (pollTimer) {
+      clearInterval(pollTimer)
+      pollTimer = null
+    }
+    onEvent(payload)
+  }
+
+  if (!supabase) {
+    startPolling()
+    return () => {
+      active = false
+      if (pollTimer) clearInterval(pollTimer)
+    }
+  }
+
   try {
-    client = new Client({
-      webSocketFactory: () => new SockJS(`${API_BASE}/ws`),
-      reconnectDelay: 4000,
-      onConnect: () => {
-        if (pollTimer) {
-          clearInterval(pollTimer)
-          pollTimer = null
+    const filter = `space_id=eq.${spaceId}`
+    channel = supabase
+      .channel(`space-${spaceId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'artifacts', filter }, (payload) => {
+        emit({ type: 'ARTIFACT_ADDED', artifact: payload.new })
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'artifacts', filter }, (payload) => {
+        if (payload.new?.group_id && payload.new.group_id !== payload.old?.group_id) {
+          emit({ type: 'GROUPS_UPDATED', groupId: payload.new.group_id })
+        } else {
+          emit({ type: 'POLL' })
         }
-        client.subscribe(`/topic/space/${spaceId}`, (message) => {
-          try {
-            onEvent(JSON.parse(message.body))
-          } catch {
-            onEvent({ type: 'POLL' })
-          }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'artifact_groups', filter }, (payload) => {
+        emit({ type: 'GROUPS_UPDATED', groupId: payload.new?.id })
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'members', filter }, (payload) => {
+        emit({
+          type: 'MEMBER_JOINED',
+          nickname: payload.new?.nickname,
+          major: payload.new?.major,
         })
-      },
-      onStompError: startPolling,
-      onWebSocketClose: () => {
-        if (active) startPolling()
-      },
-    })
-    client.activate()
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          subscribed = true
+          if (pollTimer) {
+            clearInterval(pollTimer)
+            pollTimer = null
+          }
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          subscribed = false
+          startPolling()
+        }
+      })
+
     setTimeout(() => {
-      if (active && (!client.connected)) startPolling()
+      if (active && !subscribed) startPolling()
     }, 2500)
   } catch {
     startPolling()
@@ -47,6 +77,6 @@ export function connectSpaceRealtime(spaceId, onEvent) {
   return () => {
     active = false
     if (pollTimer) clearInterval(pollTimer)
-    if (client) client.deactivate()
+    if (channel) supabase.removeChannel(channel)
   }
 }

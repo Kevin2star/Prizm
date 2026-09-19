@@ -1,8 +1,24 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const functionsBase = supabaseUrl ? `${supabaseUrl}/functions/v1/prizm-api` : ''
+
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+  if (!functionsBase || !supabaseAnonKey) {
+    throw new Error('VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 설정하세요.')
+  }
+  const response = await fetch(`${functionsBase}${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${supabaseAnonKey}`,
+      apikey: supabaseAnonKey,
+      ...(options.headers || {}),
+    },
     ...options,
   })
   const text = await response.text()
@@ -16,16 +32,15 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  createSpace: (name) => request('/api/spaces', { method: 'POST', body: JSON.stringify({ name }) }),
+  health: () => request('/health'),
+  createSpace: (name) => request('/spaces', { method: 'POST', body: JSON.stringify({ name }) }),
   joinSpace: (code, body) =>
-    request(`/api/spaces/${encodeURIComponent(code)}/join`, { method: 'POST', body: JSON.stringify(body) }),
-  getSpace: (id) => request(`/api/spaces/${id}`),
-  getGraph: (id) => request(`/api/spaces/${id}/graph`),
-  listArtifacts: (spaceId) => request(`/api/spaces/${spaceId}/artifacts`),
+    request(`/spaces/${encodeURIComponent(code)}/join`, { method: 'POST', body: JSON.stringify(body) }),
+  getSpace: (id) => request(`/spaces/${id}`),
+  getGraph: (id) => request(`/spaces/${id}/graph`),
+  listArtifacts: (spaceId) => request(`/spaces/${spaceId}/artifacts`),
   createArtifact: (spaceId, body) =>
-    request(`/api/spaces/${spaceId}/artifacts`, { method: 'POST', body: JSON.stringify(body) }),
-  getArtifact: (id) => request(`/api/artifacts/${id}`),
-  getGroup: (id) => request(`/api/groups/${id}`),
+    request(`/spaces/${spaceId}/artifacts`, { method: 'POST', body: JSON.stringify(body) }),
+  getArtifact: (id) => request(`/artifacts/${id}`),
+  getGroup: (id) => request(`/groups/${id}`),
 }
-
-export { API_BASE }
